@@ -1,0 +1,3 @@
+name,clock_mean,clock_median,clock_variance,clock_stddev,clock_curtosis,clock_skew,instructions,branches,branch_misses,cache_misses
+indexOfScalar,156.85800,150.00000,518.64542,22.77379,2.53409,0.90341,2027.91800,356.55000,25.65300,5.69500
+indexOfPosLinear,4747.56000,2945.00000,13095785.38326,3618.80994,2.72652,1.49433,81907.91100,18953.29100,24.29100,3.51400

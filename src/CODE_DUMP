@@ -1,0 +1,40 @@
+    const data = try std.heap.page_allocator.alloc(f64, 1_000);
+        defer std.heap.page_allocator.free(data);
+
+    var timer = std.time.Timer.start() catch unreachable;
+    
+    //// start by calculating our noise floor so we can adjust other
+    //// samples to account for any overhead accrued by measuring
+    noise_floor = calculateNoiseFloor(data);
+    std.debug.print("noise floor: {}\n", .{ noise_floor });
+        
+    for (data[0..]) |*sample| {
+
+        const needle = rand.int(u8);
+
+        timer.reset();
+
+        forceCall(foo, .{ haystack, needle });
+
+        // TODO: same here - subtract from overall times
+        sample.* = @as(f64, @floatFromInt(timer.read())) - noise_floor;
+    }
+
+    const foo_stats = BaseStats.init("foo", data);
+
+    for (data[0..]) |*sample| {
+
+        const needle = rand.int(u8);
+
+        timer.reset();
+
+        forceCall(bar, .{ haystack, needle });
+
+        // TODO: same here - subtract from overall times
+        sample.* = @as(f64, @floatFromInt(timer.read())) - noise_floor;
+    }
+
+    const bar_stats = BaseStats.init("bar", data);
+
+    std.debug.print("{}", .{ foo_stats });
+    std.debug.print("{}", .{ bar_stats });
