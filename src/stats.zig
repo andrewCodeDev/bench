@@ -1,7 +1,7 @@
 const std = @import("std");
 
 pub const hw = @cImport({
-    @cInclude("/home/andrew/ZigCode/bench/src/hw_counter.h");
+    @cInclude("hw_counter.h");
 });
 
 pub const CSV_COLUMN_NAMES: []const u8 =
@@ -178,6 +178,13 @@ pub inline fn forceCall(comptime func: anytype, args: anytype) void {
 }
 
 // assumes that data is sorted
+pub fn findP25(values: []const f64) f64 {
+    const N: f64 = @floatFromInt(values.len);
+    const round: usize = @intFromFloat(@round(N * 0.25));
+    return values[round];
+}
+
+// assumes that data is sorted
 pub fn findP50(values: []const f64) f64 {
 
     const N: usize = values.len;
@@ -189,13 +196,6 @@ pub fn findP50(values: []const f64) f64 {
         const i: usize = (N / 2) + 1;
         return values[i];
     }
-}
-
-// assumes that data is sorted
-pub fn findP25(values: []const f64) f64 {
-    const N: f64 = @floatFromInt(values.len);
-    const round: usize = @intFromFloat(@round(N * 0.25));
-    return values[round];
 }
 
 // assumes that data is sorted

@@ -13,6 +13,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    exe.addIncludePath(b.path("src"));
+
     exe.addCSourceFile(.{
         .file = b.path("src/hw_counter.c"),
         .flags = &.{ "-O3" }
