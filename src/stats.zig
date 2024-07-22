@@ -180,7 +180,7 @@ pub inline fn forceCall(comptime func: anytype, args: anytype) void {
 // assumes that data is sorted
 pub fn findP25(values: []const f64) f64 {
     const N: f64 = @floatFromInt(values.len);
-    const round: usize = @intFromFloat(@round(N * 0.25));
+    const round: usize = @as(usize, @intFromFloat(@round(N * 0.25))) - 1;
     return values[round];
 }
 
@@ -201,7 +201,7 @@ pub fn findP50(values: []const f64) f64 {
 // assumes that data is sorted
 pub fn findP75(values: []const f64) f64 {
     const N: f64 = @floatFromInt(values.len);
-    const round: usize = @intFromFloat(@round(N * 0.75));
+    const round: usize = @as(usize, @intFromFloat(@round(N * 0.75))) - 1;
     return values[round];
 }
 

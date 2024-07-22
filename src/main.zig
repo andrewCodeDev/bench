@@ -2,13 +2,13 @@ const std = @import("std");
 
 const stats = @import("stats.zig");
 
+var prng = std.Random.DefaultPrng.init(42);
+const rand = prng.random();
+
 pub fn main() !void {
 
     ///////////////////////////////////////////////
     
-    var prng = std.Random.DefaultPrng.init(42);
-    const rand = prng.random();
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
@@ -38,18 +38,20 @@ pub fn main() !void {
 
     for (0..data.samples()) |_| {
 
-        const needle = rand.int(u8);
+        //const needle = rand.int(u8);
 
         const desc = stats.hw.all_start();
 
         timer.reset();
     
-        stats.forceCall(foo, .{ haystack, needle });
+        for (0..1000) |i| {
+            stats.forceCall(foo, .{ i, i + 1 });
+        }
 
         data.append(timer.read(), desc);
     }
 
-    const foo_stats = data.stats("indexOfScalar");
+    const foo_stats = data.stats("foo");
 
     ////////////////////////////////////////////
 
@@ -57,18 +59,20 @@ pub fn main() !void {
 
     for (0..data.samples()) |_| {
 
-        const needle = rand.int(u8);
+        //const needle = rand.int(u8);
 
         const desc = stats.hw.all_start();
 
         timer.reset();
     
-        stats.forceCall(bar, .{ haystack, needle });
+        for (0..1000) |i| {
+            stats.forceCall(bar, .{ i, i + 1 });
+        }
 
         data.append(timer.read(), desc);
     }
 
-    const bar_stats = data.stats("indexOfPosLinear");
+    const bar_stats = data.stats("bar");
 
     ////////////////////////////////////////////
 
@@ -83,11 +87,22 @@ pub fn main() !void {
 }
 
 // helpers to normalize the interface - not necessary
-pub fn foo(haystack: []const u8, needle: u8) ?usize {
-    return std.mem.indexOfScalar(u8, haystack, needle);
+//pub fn foo(haystack: []const u8, needle: u8) ?usize {
+//    return std.mem.indexOfScalar(u8, haystack, needle);
+//}
+//
+//pub fn bar(haystack: []const u8, needle: u8) ?usize {
+//    return std.mem.indexOfPosLinear(u8, haystack, 0, &.{ needle });
+//}
+
+pub fn foo(x: usize, y: usize) usize {
+    if (rand.float(f64) <= 0.50) {
+        return x + y;
+    }
+    return x * y;
 }
 
-pub fn bar(haystack: []const u8, needle: u8) ?usize {
-    return std.mem.indexOfPosLinear(u8, haystack, 0, &.{ needle });
+pub fn bar(x: usize, y: usize) usize {
+    return x + y;
 }
 
