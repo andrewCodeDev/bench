@@ -1,17 +1,18 @@
 const std = @import("std");
 
 pub const hw = @cImport({
-    @cInclude("/home/andrew/ZigCode/Stats/src/hw_counter.h");
+    @cInclude("/home/andrew/ZigCode/bench/src/hw_counter.h");
 });
 
 pub const CSV_COLUMN_NAMES: []const u8 =
-        "name,clock_mean,clock_median,clock_variance,clock_stddev,clock_curtosis,clock_skew,instructions,branches,branch_misses,cache_misses\n";
+    "name,clock_min,clock_p25,clock_p50,clock_p75,clock_max,instructions,branches,branch_misses,cache_references,cache_misses\n";
 
 pub const Measurement = enum {
     wall_clock,  
     instructions,
     branches,
     branch_misses,
+    cache_references,
     cache_misses,
 };
 
@@ -20,6 +21,7 @@ pub const DataBlock = struct {
     instructions: []f64,
     branches: []f64,
     branch_misses: []f64,
+    cache_references: []f64,
     cache_misses: []f64,
     index: usize,
     pub fn init(allocator: std.mem.Allocator, sample_size: usize) !DataBlock {
@@ -28,6 +30,7 @@ pub const DataBlock = struct {
             .instructions = try allocator.alloc(f64, sample_size),
             .branches = try allocator.alloc(f64, sample_size),
             .branch_misses = try allocator.alloc(f64, sample_size),
+            .cache_references = try allocator.alloc(f64, sample_size),
             .cache_misses = try allocator.alloc(f64, sample_size),
             .index = 0,
         };
@@ -38,6 +41,7 @@ pub const DataBlock = struct {
         allocator.free(self.instructions);
         allocator.free(self.branches);
         allocator.free(self.branch_misses);
+        allocator.free(self.cache_references);
         allocator.free(self.cache_misses);
     }
 
@@ -59,8 +63,20 @@ pub const DataBlock = struct {
         self.instructions[self.index] = @floatFromInt(counts.data[0]);
         self.branches[self.index] = @floatFromInt(counts.data[1]);
         self.branch_misses[self.index] = @floatFromInt(counts.data[2]);
-        self.cache_misses[self.index] = @floatFromInt(counts.data[3]);
+        self.cache_references[self.index] = @floatFromInt(counts.data[3]);
+        self.cache_misses[self.index] = @floatFromInt(counts.data[4]);
         self.index += 1;
+    }
+
+    pub fn sort(self: DataBlock) void {
+        // sorting helps us remove outliers to
+        // calculate means and find percentiles
+        std.sort.pdq(f64, self.wall_clock, {}, std.sort.asc(f64));
+        std.sort.pdq(f64, self.instructions, {}, std.sort.asc(f64));
+        std.sort.pdq(f64, self.branches, {}, std.sort.asc(f64));
+        std.sort.pdq(f64, self.branch_misses, {}, std.sort.asc(f64));
+        std.sort.pdq(f64, self.cache_references, {}, std.sort.asc(f64));
+        std.sort.pdq(f64, self.cache_misses, {}, std.sort.asc(f64));
     }
 
     pub fn reset(self: *DataBlock) void {
@@ -74,98 +90,36 @@ pub const DataBlock = struct {
 
 pub const BaseStats = struct {
     name: []const u8 = "",
-    mean: f64 = 0.0,
-    median: f64 = 0.0,
-    variance: f64 = 0.0,
-    stddev: f64 = 0.0,
-    kurtosis: f64 = 0.0,
-    skew: f64 = 0.0,
+    clock_min: f64 = 0.0,
+    clock_p25: f64 = 0.0,
+    clock_p50: f64 = 0.0,
+    clock_p75: f64 = 0.0,
+    clock_max: f64 = 0.0,
     instructions: f64 = 0.0,
     branches: f64 = 0.0,
     branch_misses: f64 = 0.0,
+    cache_references: f64 = 0.0,
     cache_misses: f64 = 0.0,
     // sorts the incoming array
     fn init(name: []const u8, data: *const DataBlock) BaseStats {
 
-        const values: []f64 = data.slice(.wall_clock);
-        
-        const N: f64 = @floatFromInt(values.len);
+        data.sort();
 
-        // sort for calculating the median values
-        std.sort.pdq(f64, values, {}, std.sort.asc(f64));
-
-        const cleaned: []const f64 = blk: {
-            const Q1 = values[values.len / 4];
-            const Q3 = values[values.len - values.len / 4];
-            const IQR = Q3 - Q1;
-            const lower = Q1 - IQR * 1.5;
-            const upper = Q3 + IQR * 1.5;
-
-            var i: usize = 0;
-            while (i < values.len) : (i += 1) {
-               if (values[i] >= lower) break;
-            }
-            var j: usize = values.len - 1;
-            while (true) : (j -= 1) {
-               if (values[j] <= upper) break;
-               if (j == 0) break;
-            }
-            break :blk values[i..j];
-        };
-
-        const median: f64 = findMedian(cleaned);
-
-        const mean: f64 = blk: {
-            var tmp: f64 = 0.0;
-            for (values) |v| tmp += v;
-            break :blk tmp / N;
-        };
-
-        // use for kurtosis and standard deviation
-        const variance: f64  = blk: {
-            var tmp: f64 = 0.0;
-            for (cleaned) |v| tmp += pow_2(v - mean);
-            break :blk tmp / N;
-        };
-
-        const stddev: f64 = std.math.sqrt(variance);
-
-        // use for kurtosis and standard deviation
-        const kurtosis: f64  = blk: {
-            var tmp: f64 = 0.0;
-            for (cleaned) |v| tmp += pow_4(v - mean);
-            break :blk tmp / (N * pow_4(stddev));
-        };
-
-        const skew = (3.0 * (mean - median)) / stddev;
+        const clock = data.slice(.wall_clock);
 
         return .{
             .name = name,
-            .mean = mean,  
-            .median = median,
-            .variance = variance,
-            .stddev = stddev,
-            .kurtosis = kurtosis,
-            .skew = skew,
-            .instructions = calcMean(data.slice(.instructions)),
-            .branches = calcMean(data.slice(.branches)),
-            .branch_misses = calcMean(data.slice(.branch_misses)),
-            .cache_misses = calcMean(data.slice(.cache_misses)),
+            .clock_min = findMin(clock),
+            .clock_p25 = findP25(clock),
+            .clock_p50 = findP50(clock),
+            .clock_p75 = findP75(clock),
+            .clock_max = findMax(clock),
+            .instructions = findP50(data.slice(.instructions)),
+            .branches = findP50(data.slice(.branches)),
+            .branch_misses = findP50(data.slice(.branch_misses)),
+            .cache_references = findP50(data.slice(.cache_references)),
+            .cache_misses = findP50(data.slice(.cache_misses)),
         };
-    }
-
-    pub fn isNormal(self: BaseStats) bool {
-
-        // the following are broad heuristics
-
-        // given that a normal distribution has a kurtosis
-        // of 3, we check to see if we are with +/-1 of 3
-        const check_kurtosis: bool = (1.0 > @abs(self.kurtosis - 3.0));
-        
-        // likewise, skew should be within +/- 1
-        const check_skew: bool = (1.0 > @abs(self.skew));
-
-        return check_kurtosis and check_skew;
     }
 
     pub fn format(
@@ -175,30 +129,30 @@ pub const BaseStats = struct {
         writer: anytype,
     ) !void {
         _ = try writer.print("Name: {s}\n", .{ base.name });
-        _ = try writer.print("\tclock mean     : {d:.5},\n", .{ base.mean });
-        _ = try writer.print("\tclock median   : {d:.5},\n", .{ base.median });
-        _ = try writer.print("\tclock variance : {d:.5},\n", .{ base.variance });
-        _ = try writer.print("\tclock stddev   : {d:.5},\n", .{ base.stddev });
-        _ = try writer.print("\tclock kurtosis : {d:.5},\n", .{ base.kurtosis });
-        _ = try writer.print("\tclock skew     : {d:.5},\n", .{ base.skew });
-        _ = try writer.print("\tinstructions   : {d:.5},\n", .{ base.instructions });
-        _ = try writer.print("\tbranches       : {d:.5},\n", .{ base.branches });
-        _ = try writer.print("\tbranch misses  : {d:.5},\n", .{ base.branch_misses });
-        _ = try writer.print("\tcache misses   : {d:.5},\n\n", .{ base.cache_misses });
+        _ = try writer.print("\tclock min         : {d:.5},\n", .{ base.clock_min });
+        _ = try writer.print("\tclock p25         : {d:.5},\n", .{ base.clock_p25 });
+        _ = try writer.print("\tclock p50         : {d:.5},\n", .{ base.clock_p50 });
+        _ = try writer.print("\tclock p75         : {d:.5},\n", .{ base.clock_p75 });
+        _ = try writer.print("\tclock max         : {d:.5},\n", .{ base.clock_max });
+        _ = try writer.print("\tinstructions      : {d:.5},\n", .{ base.instructions });
+        _ = try writer.print("\tbranches          : {d:.5},\n", .{ base.branches });
+        _ = try writer.print("\tbranch misses     : {d:.5},\n", .{ base.branch_misses });
+        _ = try writer.print("\tcache references  : {d:.5},\n", .{ base.cache_references });
+        _ = try writer.print("\tcache misses      : {d:.5},\n\n", .{ base.cache_misses });
     }
 
     pub fn write(self: BaseStats, writer: anytype) !void {
         try writer.print("{s},{d:.5},{d:.5},{d:.5},{d:.5},{d:.5},{d:.5},{d:.5},{d:.5},{d:.5},{d:.5}\n", .{
             self.name,
-            self.mean,
-            self.median,
-            self.variance,
-            self.stddev,
-            self.kurtosis,
-            self.skew,
+            self.clock_min,
+            self.clock_p25,
+            self.clock_p50,
+            self.clock_p75,
+            self.clock_max,
             self.instructions,
             self.branches,
             self.branch_misses,
+            self.cache_references,
             self.cache_misses,
         });
     }
@@ -223,16 +177,8 @@ pub inline fn forceCall(comptime func: anytype, args: anytype) void {
     }
 }
 
-fn pow_2(x: f64) f64 {
-    return x * x;
-}
-
-fn pow_4(x: f64) f64 {
-    return x * x * x * x;
-}
-
 // assumes that data is sorted
-pub fn findMedian(values: []const f64) f64 {
+pub fn findP50(values: []const f64) f64 {
 
     const N: usize = values.len;
 
@@ -246,14 +192,25 @@ pub fn findMedian(values: []const f64) f64 {
 }
 
 // assumes that data is sorted
-fn calcMean(values: []const f64) f64 {
-
-    var tmp: f64 = 0.0;
-
-    for (values) |v| tmp += v;
-
+pub fn findP25(values: []const f64) f64 {
     const N: f64 = @floatFromInt(values.len);
-
-    return tmp / N;
+    const round: usize = @intFromFloat(@round(N * 0.25));
+    return values[round];
 }
 
+// assumes that data is sorted
+pub fn findP75(values: []const f64) f64 {
+    const N: f64 = @floatFromInt(values.len);
+    const round: usize = @intFromFloat(@round(N * 0.75));
+    return values[round];
+}
+
+// assumes that data is sorted
+pub fn findMax(values: []const f64) f64 {
+    return values[values.len - 1];
+}
+
+// assumes that data is sorted
+pub fn findMin(values: []const f64) f64 {
+    return values[0];
+}

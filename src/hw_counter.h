@@ -1,9 +1,9 @@
 typedef struct {
-    long fds[4];
+    long fds[5];
 } Descriptors;
 
 typedef struct {
-    long long data[4];
+    long long data[5];
 } Counts;
 
 // These functions return a file-descriptor that
@@ -11,6 +11,7 @@ typedef struct {
 long instruction_start();
 long branch_start();
 long branch_miss_start();
+long cache_reference_start();
 long cache_miss_start();
 
 // expects a file descriptor that was created by

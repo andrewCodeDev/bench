@@ -64,6 +64,9 @@ long branch_start() {
 long branch_miss_start() {
     return counter_start(PERF_COUNT_HW_BRANCH_MISSES);
 }
+long cache_reference_start() {
+    return counter_start(PERF_COUNT_HW_CACHE_REFERENCES);
+}
 long cache_miss_start() {
     return counter_start(PERF_COUNT_HW_CACHE_MISSES);
 }
@@ -73,7 +76,8 @@ Descriptors all_start() {
     desc.fds[0] = instruction_start();
     desc.fds[1] = branch_start();
     desc.fds[2] = branch_miss_start();
-    desc.fds[3] = cache_miss_start();
+    desc.fds[3] = cache_reference_start();
+    desc.fds[4] = cache_miss_start();
     return desc;
 }
 
@@ -83,5 +87,6 @@ Counts all_read(Descriptors desc) {
     counts.data[1] = count_read(desc.fds[1]);
     counts.data[2] = count_read(desc.fds[2]);
     counts.data[3] = count_read(desc.fds[3]);
+    counts.data[4] = count_read(desc.fds[4]);
     return counts;
 }
